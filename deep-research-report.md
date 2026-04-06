@@ -1,0 +1,79 @@
+# Multi-Agent Deepfake Speech Detection
+
+Audio deepfakes (AI-generated speech via TTS or voice conversion) are increasingly realistic and pose security threats【22†L168-L177】【16†L55-L63】.  State-of-the-art countermeasures typically train a single classifier on spectral features (e.g. MFCC/LFCC/CQCC) or raw-waveform embeddings (via SSL models)【49†L31-L39】【36†L858-L866】.  However, these models often **overfit** to known synthesis methods and fail on unseen attacks【13†L22-L28】【62†L61-L64】.  To address this, recent works propose *multi-agent detection*: use several specialized detectors (“agents”) focusing on different feature types (spectral, prosodic, linguistic, etc.), then fuse their outputs via a decision-level agent.  This ensemble approach aims to improve generalization and interpretability【13†L22-L28】【62†L43-L51】. 
+
+**Datasets (ASVspoof 2024–2025).**  Modern deepfake audio benchmarks include the ASVspoof Logical Access tracks.  The ASVspoof 5 dataset (2024 challenge) contains *2000 speakers* and spoofed utterances from 32 TTS/VC generators and adversarial attacks【59†L82-L90】.  ASVspoof 2025 uses similar Logical Access (LA) corpora with diverse algorithms.  These datasets simulate “in-domain” (known spoofing) and “out-of-domain” (new generator) scenarios.  Evaluation typically uses Equal Error Rate (EER) or tandem Detection Cost Function (t-DCF)【18†L436-L444】; EER is popular because it is threshold-free and directly measures the tradeoff between false alarms and misses in binary detection【18†L436-L444】.
+
+**Discriminative Audio Features.**  Deepfake detection exploits artifacts in multiple speech domains:
+
+- **Spectral features:** Short-term spectral cues (e.g. MFCC, LFCC, CQCC, spectrograms) capture fine-grained frequency patterns.  These are widely used in anti-spoofing【49†L75-L84】【49†L93-L100】.  For example, Warren *et al.* note that subtle spectral artifacts are often exploited by early detectors【49†L75-L84】.  SSL-based embeddings (e.g. Wav2Vec2.0, WavLM, HuBERT) have become state-of-the-art, but combining them with handcrafted spectral features can improve robustness【49†L104-L113】【49†L31-L39】.  
+
+- **Prosodic features:** High-level speech attributes (pitch/fundamental frequency F0, jitter, shimmer, energy/HNR, speaking rate, rhythm) span longer time scales【36†L901-L910】【25†L1-L4】.  Deepfake generators often produce unnatural prosody.  Warren *et al.* build a “prosody agent” using just six features (mean/std of pitch, jitter, shimmer, HNR)【16†L61-L69】.  Their model achieved 93% accuracy on ASVspoof2021, demonstrating that prosodic cues alone can detect deepfakes almost as well as baselines (though with higher EER)【16†L61-L69】.  Prosodic analysis also proved more robust under adversarial attacks than spectral-only models【16†L65-L72】.  Other works incorporate phoneme duration and coarticulation features【36†L909-L918】.  
+
+- **Segmental/Articulatory features:** These are phonetic-level cues such as formant frequencies, voice onset time (VOT), or coarticulation patterns.  Yang *et al.* (2026) show that features derived from vowel formants and other segmental articulatory models provide strong evidence of synthetic speech.  In a forensic setting, they find that formant-based classifiers significantly outperform global features (e.g. MFCC) on both controlled and in-the-wild deepfakes【8†L19-L27】.  Specifically, their logistic-regression “speaker-specific” detectors using vowel formants achieved lower EER and calibration loss (Cllr) than baselines【8†L19-L27】.  This suggests segmental acoustic features can serve as interpretable “articulatory fingerprints” of deepfake speech.
+
+- **Linguistic features:** These involve lexical/semantic content or how speech units are realized (style vs meaning).  For example, Zhu *et al.* (NeurIPS 2024) propose SLIM, which decomposes speech into *style* (acoustic) and *linguistics* (content) subspaces.  In real speech these are correlated, but deepfakes often break this dependency.  SLIM explicitly learns this style–linguistic mismatch and flags fakes accordingly【38†L811-L819】【39†L31-L39】.  Similarly, Nguyen *et al.* (2025) show that tiny text-level changes (synonym swaps) can dramatically fool spoofing detectors【28†L43-L51】, indicating existing models may be inadvertently sensitive to linguistic patterns.  Incorporating a linguistic agent (e.g. ASR transcripts analyzed for unnatural word usage or dialect) could thus complement acoustic detectors.  
+
+In practice, systems often preprocess audio (denoising, VAD, normalization) and extract these features.  Some systems use end-to-end learning on raw waveforms (AASIST CNN-GNN【49†L87-L95】), whereas others extract spectrogram/feature matrices for CNNs or MLPs.  Kulkarni *et al.* (ASVspoof 2024) note they used **no additional data augmentation or external data**, relying on balanced clean training sets【13†L22-L28】【14†L328-L336】.
+
+**Specialized Detectors (“Agents”).**  Each feature set can feed a specialized classifier:
+
+- **Spectral Agent:** Convolutional or graph networks on spectrograms or SSL embeddings.  Typical models: ResNet/LCNN on MFCCs, AASIST (CNN+GNN) on waveforms【49†L87-L95】, TDNNs, etc.  For example, Liu *et al.* (2025) use multiple pre-trained SSL backbones (WavLM, etc.) as separate agents whose embeddings are fused by KNN【30†L31-L39】【31†L25-L33】.  
+
+- **Prosodic Agent:** A light-weight model (e.g. MLP) on hand-crafted prosody features.  Warren *et al.* used an MLP on 6 prosody stats, allowing explicit interpretation (e.g. highest-weight on jitter/shimmer)【16†L61-L69】.  
+
+- **Linguistic/Style Agent:** Models that capture textual or paralinguistic info.  SLIM’s approach creates two embeddings per utterance (style and linguistic) via self-supervised models, then measures their alignment【38†L811-L819】.  A linguistic agent might also use an ASR + language model to detect unnatural word sequences or pronunciation (e.g. “pronunciation embeddings” combined with prosody as in audio spoofing surveys【36†L913-L921】).
+
+- **Segmental Agent:** Classifiers trained on articulatory features (e.g. vowel formants or coarticulation).  Yang *et al.*’s work effectively treats formant analysis as a specialized agent for each vowel【8†L19-L27】.
+
+Each agent outputs a score or decision (real vs fake).  In some systems, agents may explicitly generate “rationales” (e.g. SHAP values on features【26†L43-L52】 or attention weights【16†L65-L72】) to explain their decision.
+
+**Fusion/Voting Strategies:**  The decision-level “meta-agent” combines agent outputs.  Approaches include:
+
+- **Score-Level Fusion:** Simple averaging or weighted sum of agent scores.  For example, Kulkarni *et al.* average scores from several SSL-based detectors, which significantly improves out-of-domain robustness【13†L22-L28】【14†L328-L336】.  Liu *et al.* (2025) propose *linear fusion*: learning weights for combining the original SSL-CM score with the retrieval-augmented ensemble score【31†L55-L64】.  
+
+- **Embedding/Feature Fusion:** Concatenating or attentively merging feature vectors before classification.  For instance, Jiang *et al.* (2025) fuse spectral features (MFCC, LFCC, CQCC) with self-supervised embeddings using cross-attention.  They report that all fusion variants outperform SSL-only baselines, with *cross-attention fusion* yielding the best generalization (38% relative EER reduction)【49†L31-L39】.  Gating mechanisms can learn per-feature weights dynamically【49†L31-L39】.
+
+- **Meta-Classifier (Stacking):** Train a second-level model on agents’ outputs.  In the DeepAgent framework (multi-modal A/V deepfake detection), the authors use a Random Forest that takes the probabilistic outputs of two agents (visual CNN and audio-visual semantic agent) to make the final decision【33†L347-L354】.  Analogously, one could train a meta-classifier on the scores or embeddings of the spectral, prosodic, and linguistic agents.
+
+- **Selective Fusion:** First detect if an input is in-domain or out-of-domain, then choose which agent(s) to trust.  Liu *et al.* introduce a two-database scheme: one for OOD detection and one for standard detection.  Their “selective fusion” uses a small k-NN OOD detector to decide if a test utterance should be handled by the original SSL model or by the retrieval-augmented ensemble【31†L37-L46】. 
+
+- **Voting/Ensemble Methods:** Classical ensembles (bagging, boosting) have also been applied.  For example, one study uses AdaBoost with decision trees on MFCCs【51†L159-L168】, while another builds an ensemble of multiple classifiers (SVM, KNN, DT) via majority vote or stacking【51†L159-L168】.  These can be seen as simple voting-based agents (each tree or model is an “agent” voting on authenticity).
+
+- **Retrieval-Augmented Fusion:** Liu *et al.* (2025) propose a *retrieval* ensemble: they construct a database of reference (feature,score) pairs from known data, then during inference find k-NN of the query in this database and aggregate their labels/scores【30†L31-L39】.  This is essentially a k-NN ensemble.  By combining these retrieved vote(s) with a base classifier (via linear or selective fusion), they achieve performance comparable to a fine-tuned model on “zero-day” attacks without retraining【30†L31-L39】【31†L37-L46】.
+
+**Explainability:**  Multi-agent setups naturally lend themselves to interpretation.  Each agent’s decision is based on a distinct feature type, so one can trace **why** an utterance was flagged:
+
+- A prosodic agent might highlight high jitter/shimmer as suspicious【16†L65-L72】.
+- A segmental agent might show abnormal formant trajectories【8†L19-L27】.
+- A linguistic agent (like SLIM) can pinpoint where style-content alignment is off【39†L31-L39】.
+- Attention or SHAP on any agent’s features can reveal influential variables【16†L65-L72】【62†L43-L51】.
+- Zhang *et al.* emphasize that explainability helps identify model weaknesses and refine feature design【62†L43-L51】.  Indeed, several works use attention heatmaps (Warren *et al.*) or explicit “style-vs-linguistic” differences (Zhu *et al.*) to explain decisions.  Incorporating multiple agents also enables cross-checks: if spectral and prosodic agents agree on a “fake” decision, confidence is higher, whereas disagreement might trigger a secondary review.
+
+**Performance & Metrics:**  Table 1 summarizes key literature (2020–2026) on deepfake audio detection.  Metrics vary (EER, accuracy, min-tDCF) but EER is common for ASVspoof evaluations.  Notably, multi-agent or fusion approaches tend to outperform single-stream baselines on generalization tests:
+
+| **Paper (Year)**               | **Features / Agents**                          | **Model / Fusion**                       | **Datasets**                        | **Performance**                                 |
+|--------------------------------|------------------------------------------------|------------------------------------------|-------------------------------------|-------------------------------------------------|
+| Kulkarni *et al.*【13†L22-L28】 (2024)    | SSL embeddings (wavLM, HuBERT)               | Ensemble of 4 SSL models (score fusion)  | ASVspoof 2019/2021/2024 (LA)        | EER improved vs single system; ensemble crucial for unseen attacks【13†L22-L28】 |
+| Warren *et al.*【16†L61-L69】 (2025)     | Prosodic features (pitch, jitter, shimmer, HNR) | MLP classifier (attention explainable)   | ASVspoof 2021 LA                   | 93.0% accuracy, EER 24.7%【16†L61-L69】 (comparable to baselines)       |
+| Yang *et al.*【8†L19-L27】 (2026)        | Formant & articulatory (segmental) features    | Speaker-specific LR classifiers         | SpoofCeleb, DF In-the-Wild         | Consistently lower EER and Cllr than MFCC-based systems【8†L19-L27】   |
+| Zhu *et al.*【38†L811-L819】 (2024)   | Style vs Linguistic embeddings (SSL + text)      | SLIM framework (contrastive SSL, explain) | ASVspoof 2019 LA                  |  Outperforms baselines on out-of-domain (OD) tests; improved generalization【38†L811-L819】【39†L31-L39】 |
+| Celik *et al.*【47†L88-L97】 (2026)      | Hand-crafted wavelet & pattern features        | kNN/SVM with iterative feature selection | ASVspoof 2019/2021, others         | Acc 89.2–99.2%, EER 0.97–10.85%; matches or beats many DL systems【47†L88-L97】 |
+| Liu *et al.*【30†L31-L39】 (2025)        | SSL embeddings + voice-profile vectors         | Retrieval (k-NN) + fusion (linear/sel.) | DeepFake-Eval-2024, AI4T (Cross-db) | EER ~12% (fusion) on DE2024; ~15% on AI4T (unseen)【31†L65-L74】 |
+| Yang *et al.*【45†L54-L63】 (2025)       | Hierarchical Poincaré prototypical features     | Poin-HierNet (hyperbolic protos + whitening) | ASVspoof 2019/2021, In-The-Wild | Outperforms SOTA (lowest EER) on multiple test sets【45†L54-L63】 |
+| Kulkarni *et al.*【61†L30-L39】 (2025)   | SSL (wav2vec2-XLSR) + Conformer embeddings      | Deep metric (N-pair loss) + ensemble fusion | ADD2023T3 (source tracing)        | “Superior performance” in source-tracing; fusion improves generalization【61†L30-L39】【61†L41-L45】 |
+
+*Table 1.* Selected studies on deepfake speech detection (2020–2026). Note: ACC = accuracy, EER = equal error rate.
+
+Most works report *EER or accuracy*, since deepfake detection is a binary task【18†L436-L444】.  For example, Warren *et al.* achieved 93% accuracy (EER 24.7%) using only prosodic features【16†L61-L69】.  Yang *et al.*’s forensic models showed much lower EER on unseen data than conventional systems【8†L19-L27】.  Fusion-based approaches (e.g. Kulkarni, Liu) consistently lower EER in cross-domain tests compared to single models【13†L22-L28】【31†L65-L74】.  
+
+**Discussion & Proposed Framework:**  In summary, the literature suggests that no single feature type suffices for robust deepfake detection.  Spectral, prosodic, and linguistic artifacts each capture different weaknesses of synthetic speech【16†L61-L69】【38†L811-L819】.  We thus propose a *multi-agent voting framework*: 
+
+- **Agents:** (1) a *Spectral Agent* (e.g. a CNN or SSL-based network on mel-spectrograms), (2) a *Prosodic Agent* (MLP on F0/jitter/shimmer stats), and (3) a *Linguistic Agent* (model measuring style-content consistency, e.g. SLIM). Each agent is trained independently to output a real-vs-fake score.  
+- **Decision Fusion:** A meta-classifier (e.g. a small neural net or ensemble) takes the agents’ scores (and possibly their embeddings) and produces the final verdict.  In parallel, an attention or SHAP layer can highlight which agent and which features influenced the decision, providing an explanation (as suggested in【16†L65-L72】【62†L43-L51】).  
+- **Training Strategy:**  We can use multi-stage training (as in Kulkarni 2024) to focus agents on generalizable patterns, and possibly a selective OOD detector (as in Liu 2025) to route utterances adaptively. Data augmentation (voice conversion, reverberation) can further harden each agent.  
+
+**Evaluation:**  Such a system should be evaluated on ASVspoof 2024/2025 LA corpora, with a focus on cross-generator generalization.  We expect **ensemble fusion** to reduce overfitting: prior work shows that combining diverse systems significantly mitigates performance collapse on novel attacks【13†L22-L28】【31†L65-L74】.  We would measure EER, accuracy, and min-tDCF; low EER and low Cllr (log-likelihood loss) on unknown spoofers would indicate robustness【8†L19-L27】. Explainability can be assessed via diagnostic tests (e.g. how well the explanation highlights known artifacts).  
+
+In conclusion, by integrating **multiple specialized detectors** and fusing their judgments, one can build a deepfake speech classifier that is both more **robust to unseen generators** and more **interpretable** than monolithic models.  This aligns with recent research trends emphasizing **ensemble learning and explainability** in anti-spoofing【13†L22-L28】【62†L43-L51】, and offers a promising path toward trustworthy deepfake detection.
+

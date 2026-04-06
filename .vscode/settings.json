@@ -1,0 +1,18 @@
+{
+  "python.defaultInterpreterPath": "D:\\Others\\Miniconda\\envs\\speech-workspace\\python.exe",
+  "python.terminal.activateEnvironment": true,
+  "terminal.integrated.defaultProfile.windows": "PowerShell (Workspace)",
+  "terminal.integrated.profiles.windows": {
+    "PowerShell (Workspace)": {
+      "path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "args": [
+        "-ExecutionPolicy",
+        "ByPass",
+        "-NoLogo",
+        "-NoExit",
+        "-Command",
+        "& 'D:\\Others\\Miniconda\\shell\\condabin\\conda-hook.ps1' ; conda activate speech-workspace"
+      ]
+    }
+  }
+}

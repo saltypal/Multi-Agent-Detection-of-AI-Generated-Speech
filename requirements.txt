@@ -1,0 +1,30 @@
+# Core numerical stack
+numpy
+scipy
+pandas
+scikit-learn
+
+# Audio and speech processing
+librosa
+soundfile
+opensmile
+praat-parselmouth
+webrtcvad
+jiwer
+
+# Deep learning and Hugging Face
+torch
+torchaudio
+transformers
+datasets
+accelerate
+huggingface-hub
+sentencepiece
+
+# Visualization and utilities
+matplotlib
+seaborn
+tqdm
+pyyaml
+rich
+openpyxl
