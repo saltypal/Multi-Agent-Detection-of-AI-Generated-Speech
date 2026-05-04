@@ -1,0 +1,32 @@
+audio:
+  sample_rate: 16000
+
+dataset:
+  kaggle_dataset: "aniket202411001/asvspoof5-flac"
+  data_factor: 0.4  # Using 40% of the dataset as requested
+  split_candidates:
+    train: ["train", "flac_T", "training", "Train"]
+    val:   ["val", "dev", "flac_D", "development", "Val"]
+    test:  ["test", "eval", "flac_E_eval", "evaluation", "Test"]
+  label_candidates:
+    bonafide: ["bonafide", "genuine", "real", "bona-fide"]
+    spoof:    ["spoof", "fake", "synthetic", "spoofed"]
+
+models:
+  whisper: "openai/whisper-small"
+  bert: "bert-base-uncased"
+  gpt2: "gpt2"
+  spectral:
+    type: "xgboost"
+    features: "tabular"
+  prosodic:
+    type: "xgboost"
+    features: "tabular"
+
+fusion:
+  mode: "weighted"
+  weights:
+    spectral: 0.35
+    prosodic: 0.20
+    linguistic: 0.45
+  decision_threshold: 0.5

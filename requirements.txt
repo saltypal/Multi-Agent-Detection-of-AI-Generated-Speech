@@ -1,18 +1,18 @@
-# Core numerical stack
+# ── Core numerical stack ──────────────────────────────────────
 numpy
 scipy
 pandas
 scikit-learn
+xgboost
 
-# Audio and speech processing
+# ── Audio & speech processing ─────────────────────────────────
 librosa
 soundfile
-opensmile
 praat-parselmouth
 webrtcvad
 jiwer
 
-# Deep learning and Hugging Face
+# ── Deep learning & HuggingFace ───────────────────────────────
 torch
 torchaudio
 transformers
@@ -20,11 +20,17 @@ datasets
 accelerate
 huggingface-hub
 sentencepiece
+openai-whisper
 
-# Visualization and utilities
+# ── Visualization & utilities ─────────────────────────────────
 matplotlib
 seaborn
 tqdm
 pyyaml
 rich
 openpyxl
+
+# ── Jupyter ───────────────────────────────────────────────────
+jupyter
+ipywidgets
+ipython

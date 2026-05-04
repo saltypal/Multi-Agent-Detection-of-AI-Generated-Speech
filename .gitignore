@@ -1,2 +1,39 @@
-.github
-/dataset
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Model checkpoints (large files — store on Drive or DVC)
+checkpoints/
+*.pt
+*.pkl
+
+# Dataset (download separately)
+data/
+
+# Transcript cache
+cache/
+
+# Evaluation outputs
+*.png
+eval_report.json
+
+# Env
+.env
+*.env
+venv/
+.venv/
+
+# Kaggle credentials
+kaggle.json
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
