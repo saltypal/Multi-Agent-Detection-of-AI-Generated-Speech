@@ -82,12 +82,17 @@ def extract_spectral_row(
         ("centroid",  librosa.feature.spectral_centroid),
         ("bandwidth", librosa.feature.spectral_bandwidth),
         ("rolloff",   librosa.feature.spectral_rolloff),
-        ("flatness",  librosa.feature.spectral_flatness),
     ]:
         feat = fn(y=y, sr=sr)[0]
         row[f"{name}_mean"] = float(np.nan_to_num(feat.mean()))
         row[f"{name}_std"]  = float(np.nan_to_num(feat.std()))
         row[f"{name}_max"]  = float(np.nan_to_num(feat.max()))
+
+    # Flatness doesn't take 'sr'
+    flatness = librosa.feature.spectral_flatness(y=y)[0]
+    row["flatness_mean"] = float(np.nan_to_num(flatness.mean()))
+    row["flatness_std"]  = float(np.nan_to_num(flatness.std()))
+    row["flatness_max"]  = float(np.nan_to_num(flatness.max()))
 
     # ── 3. Spectral contrast (7 bands) ──────────────────────────────────────
     contrast = librosa.feature.spectral_contrast(y=y, sr=sr)
