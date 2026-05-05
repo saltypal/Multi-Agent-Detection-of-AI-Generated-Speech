@@ -40,9 +40,13 @@ class LinguisticAgent:
             self.classifier = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=2).to(self.device)
             
     def transcribe(self, audio_path):
-        """Transcribe an audio file to text with safety failsafe."""
+        """Transcribe an audio file by pre-loading it to avoid header bugs."""
         try:
-            result = self.transcriber(str(audio_path))
+            # Load audio manually first to bypass the 'num_frames' header bug
+            audio, _ = librosa.load(audio_path, sr=16000)
+            
+            # Pass the raw numpy array to the transcriber
+            result = self.transcriber(audio)
             return result["text"]
         except Exception as e:
             print(f"[!] Transcription error on {audio_path}: {e}")
@@ -61,8 +65,8 @@ class LinguisticAgent:
     def predict(self, audio_path):
         """End-to-end prediction: Audio -> Text -> Probability."""
         text = self.transcribe(audio_path)
-        if not text.strip():
-            return 0.5 # Neutral if no text found
+        if not text or not text.strip():
+            return 0.0 # Return 0 (Bonafide) if transcription fails as requested
         return self.predict_text(text)
 
 def load_model(path):
