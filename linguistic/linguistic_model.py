@@ -6,6 +6,7 @@ Uses OpenAI Whisper for ASR and a fine-tuned BERT for text classification.
 """
 
 import torch
+import librosa
 from transformers import pipeline, AutoModelForSequenceClassification, AutoTokenizer
 from pathlib import Path
 import numpy as np
