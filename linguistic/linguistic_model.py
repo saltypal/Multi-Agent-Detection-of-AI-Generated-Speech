@@ -7,7 +7,7 @@ Uses OpenAI Whisper for ASR and a fine-tuned BERT for text classification.
 
 import torch
 import librosa
-from transformers import pipeline, AutoModelForSequenceClassification, AutoTokenizer
+from transformers import WhisperProcessor, WhisperForConditionalGeneration, AutoTokenizer, AutoModelForSequenceClassification
 from pathlib import Path
 import numpy as np
 
@@ -15,40 +15,39 @@ class LinguisticAgent:
     def __init__(self, model_path=None, device=None):
         """
         Initialize the Linguistic Agent.
-        If model_path is provided, it loads the fine-tuned BERT model.
         """
-        if device is None:
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        else:
-            self.device = device
-            
-        # 1. Initialize Whisper for transcription
-        # We use the 'small' model as it's a good balance of speed and accuracy
-        print(f"[*] Loading Whisper-small on {self.device}...")
-        self.transcriber = pipeline(
-            "automatic-speech-recognition",
-            model="openai/whisper-tiny",
-            device=0 if self.device == "cuda" else -1
-        )
+        self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
         
-        # 2. Initialize BERT for classification
-        self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-        if model_path and Path(model_path).exists():
+        # Load Whisper directly (skipping the buggy pipeline)
+        print(f"[*] Loading Whisper-Tiny on {self.device}...")
+        self.processor = WhisperProcessor.from_pretrained("openai/whisper-tiny")
+        self.whisper_model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny").to(self.device)
+        
+        # Load BERT for classification
+        if model_path:
             print(f"[*] Loading fine-tuned BERT from {model_path}...")
+            self.tokenizer = AutoTokenizer.from_pretrained(model_path)
             self.classifier = AutoModelForSequenceClassification.from_pretrained(model_path).to(self.device)
         else:
-            print("[!] No fine-tuned model found. Using base BERT (needs training).")
+            print("[*] Loading base BERT (for inference only)...")
+            self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
             self.classifier = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=2).to(self.device)
             
     def transcribe(self, audio_path):
-        """Transcribe an audio file by pre-loading it into an explicit raw dictionary."""
+        """Transcribe audio by bypassing the pipeline entirely."""
         try:
-            # Load audio manually first to bypass the 'num_frames' header bug
+            # 1. Load audio with librosa
             audio, _ = librosa.load(audio_path, sr=16000)
             
-            # Pass as an explicit dictionary to prevent the pipeline from guessing file metadata
-            result = self.transcriber({"raw": audio, "sampling_rate": 16000})
-            return result["text"]
+            # 2. Extract features
+            input_features = self.processor(audio, sampling_rate=16000, return_tensors="pt").input_features.to(self.device)
+            
+            # 3. Generate transcription tokens
+            predicted_ids = self.whisper_model.generate(input_features)
+            
+            # 4. Decode to text
+            transcription = self.processor.batch_decode(predicted_ids, skip_special_tokens=True)[0]
+            return transcription
         except Exception as e:
             print(f"[!] Transcription error on {audio_path}: {e}")
             return ""
