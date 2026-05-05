@@ -40,9 +40,13 @@ class LinguisticAgent:
             self.classifier = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=2).to(self.device)
             
     def transcribe(self, audio_path):
-        """Transcribe an audio file to text."""
-        result = self.transcriber(str(audio_path))
-        return result["text"]
+        """Transcribe an audio file to text with safety failsafe."""
+        try:
+            result = self.transcriber(str(audio_path))
+            return result["text"]
+        except Exception as e:
+            print(f"[!] Transcription error on {audio_path}: {e}")
+            return ""
     
     def predict_text(self, text):
         """Classify a piece of text as real (0) or fake (1)."""

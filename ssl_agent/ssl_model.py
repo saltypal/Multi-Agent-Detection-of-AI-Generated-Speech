@@ -29,8 +29,11 @@ class SSLAgent:
     @torch.no_grad()
     def predict(self, audio_path):
         waveform, _ = librosa.load(audio_path, sr=16000)
-        inputs = self.feature_extractor(waveform, sampling_rate=16000, return_tensors="pt").to(self.device)
-        outputs = self.model(**inputs)
+        inputs = self.feature_extractor(waveform, sampling_rate=16000, return_tensors="pt")
+        input_values = inputs.input_values.to(self.device)
+        
+        with torch.no_grad():
+            outputs = self.model(input_values)
         
         # Use the mean of the embeddings as the "Fusion Score"
         score = outputs.last_hidden_state.mean().item()
