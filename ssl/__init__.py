@@ -1,1 +1,1 @@
-# SSL agent — WavLM (to be implemented)
+from ssl.ssl_model import SSLAgent  # noqa: F401

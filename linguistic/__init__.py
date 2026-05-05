@@ -1,1 +1,1 @@
-# Linguistic agent — Whisper + BERT (to be implemented)
+from linguistic.linguistic_model import LinguisticAgent  # noqa: F401
