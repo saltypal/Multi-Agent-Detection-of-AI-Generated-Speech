@@ -41,13 +41,13 @@ class LinguisticAgent:
             self.classifier = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=2).to(self.device)
             
     def transcribe(self, audio_path):
-        """Transcribe an audio file by pre-loading it to avoid header bugs."""
+        """Transcribe an audio file by pre-loading it into an explicit raw dictionary."""
         try:
             # Load audio manually first to bypass the 'num_frames' header bug
             audio, _ = librosa.load(audio_path, sr=16000)
             
-            # Pass the raw numpy array to the transcriber
-            result = self.transcriber(audio)
+            # Pass as an explicit dictionary to prevent the pipeline from guessing file metadata
+            result = self.transcriber({"raw": audio, "sampling_rate": 16000})
             return result["text"]
         except Exception as e:
             print(f"[!] Transcription error on {audio_path}: {e}")
