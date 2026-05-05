@@ -5,7 +5,7 @@ from pathlib import Path
 # Add the parent directory to Python path so we can import the ssl module
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from ssl.ssl_model import SSLAgent
+from ssl_agent.ssl_model import SSLAgent
 
 def generate_dummy_audio(filename="dummy_test.wav"):
     """Generates a 1-second 16kHz sine wave audio file for testing if none exists."""
