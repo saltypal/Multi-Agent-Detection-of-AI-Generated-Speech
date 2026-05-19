@@ -161,6 +161,21 @@
                         <canvas id="radar-chart"></canvas>
                     </div>
                 </div>
+
+                <!-- Meta-Classifier Global Importances Card -->
+                <div id="meta-explain-container" class="glass-panel p-5 rounded-2xl flex flex-col hidden">
+                    <div class="flex items-center justify-between mb-4 border-b border-gray-900/30 pb-3">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400 heading-font">Meta-Classifier Architecture</h3>
+                        <span class="px-1.5 py-0.5 rounded text-[8px] font-extrabold bg-indigo-950/40 text-indigo-400 border border-indigo-900/30 heading-font">RF (EER: 31.0%)</span>
+                    </div>
+                    <div class="space-y-3.5" id="meta-importance-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                    <div class="text-[10px] text-gray-500 mt-4 leading-relaxed border-t border-gray-900/30 pt-3">
+                        <i class="fa-solid fa-circle-info text-indigo-400 mr-1"></i>
+                        These weights represent the Gini Importance (Mean Decrease in Impurity) of each agent within the trained Random Forest meta-classifier.
+                    </div>
+                </div>
             </section>
 
             <!-- RIGHT COLUMN: RESULTS, EXPLAINABILITY LOGS, AND TRANSCRIPTS (width: 7 cols) -->
@@ -529,6 +544,35 @@
             }
             if (data.prosodic_shaps) {
                 renderSignalShapBadges('prosodic', data.prosodic_shaps);
+            }
+
+            // 8. Update Meta-Classifier Global Importances
+            const metaExplainContainer = document.getElementById('meta-explain-container');
+            if (data.global_importances) {
+                metaExplainContainer.classList.remove('hidden');
+                const importanceList = document.getElementById('meta-importance-list');
+                importanceList.innerHTML = '';
+                
+                // Sort agent importances in descending order
+                const sortedAgents = Object.entries(data.global_importances).sort((a, b) => b[1] - a[1]);
+                
+                sortedAgents.forEach(([agent, val]) => {
+                    const percent = (val * 100).toFixed(1);
+                    const item = document.createElement('div');
+                    item.className = "flex flex-col space-y-1";
+                    item.innerHTML = `
+                        <div class="flex justify-between text-[10px] font-semibold">
+                            <span class="text-gray-300">${agent} Agent Weight</span>
+                            <span class="text-indigo-400 font-mono">${percent}%</span>
+                        </div>
+                        <div class="w-full bg-gray-950 h-1.5 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full bg-indigo-500 glow-indigo" style="width: ${percent}%"></div>
+                        </div>
+                    `;
+                    importanceList.appendChild(item);
+                });
+            } else {
+                metaExplainContainer.classList.add('hidden');
             }
         }
 

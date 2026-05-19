@@ -40,3 +40,6 @@ Thumbs.db
 
 redundant/
 trained_models/
+.vscode/
+.gitignore
+slef_notes.md

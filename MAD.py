@@ -34,14 +34,36 @@ class MultiAgentDetector:
         self.ling_agent = LinguisticAgent(self.root / "linguistic_bert_model", device=self.device)
         self.ssl_agent  = SSLAgent(device=self.device)
         
-        # 2. Load Fusion Meta-Classifier
-        fusion_path = self.root / "fusion model" / "fusion_meta_model.pkl"
+        # 2. Load Fusion Meta-Classifier (Prioritize Random Forest)
+        fusion_path = self.root / "fusion model" / "rf_fusion_model.pkl"
+        if not fusion_path.exists():
+            fusion_path = self.root / "fusion model" / "fusion_meta_model.pkl"
+            
+        self.global_importances = None
         if fusion_path.exists():
             print(f"[*] Loading Fusion Meta-Model from {fusion_path}...")
             self.meta_model = joblib.load(fusion_path)
+            # Warm up SHAP explainer
+            try:
+                import shap
+                self.shap_explainer = shap.TreeExplainer(self.meta_model)
+                print("[*] SHAP TreeExplainer initialized for fusion model.")
+            except Exception as e:
+                print(f"[!] Warning: Failed to initialize SHAP TreeExplainer: {e}")
+                self.shap_explainer = None
+                
+            # Extract global agent importances
+            if hasattr(self.meta_model, 'feature_importances_'):
+                self.global_importances = {
+                    'Spectral': float(self.meta_model.feature_importances_[0]),
+                    'Prosodic': float(self.meta_model.feature_importances_[1]),
+                    'Linguistic': float(self.meta_model.feature_importances_[2]),
+                    'SSL': float(self.meta_model.feature_importances_[3])
+                }
         else:
             print("[!] Fusion model not found. Using simple average instead.")
             self.meta_model = None
+            self.shap_explainer = None
 
     def detect(self, audio_path):
         """
@@ -89,14 +111,49 @@ class MultiAgentDetector:
             X = np.array([[p_spec, p_pros, p_ling, p_ssl]])
             final_prob = self.meta_model.predict_proba(X)[0][1]
             
-            # Exact linear Shapley/feature contributions for log-odds logit
-            coefs = self.meta_model.coef_[0]
-            shap_values = {
-                'Spectral': float(coefs[0] * p_spec),
-                'Prosodic': float(coefs[1] * p_pros),
-                'Linguistic': float(coefs[2] * p_ling),
-                'SSL': float(coefs[3] * p_ssl)
-            }
+            # Compute Tree-SHAP values
+            if hasattr(self, 'shap_explainer') and self.shap_explainer is not None:
+                try:
+                    raw_shaps = self.shap_explainer.shap_values(X)
+                    if isinstance(raw_shaps, list):
+                        # sklearn RF returns [Class 0 SHAPs, Class 1 SHAPs]
+                        local_shaps = raw_shaps[1][0]
+                    else:
+                        if len(raw_shaps.shape) == 3:
+                            local_shaps = raw_shaps[0, :, 1]
+                        else:
+                            local_shaps = raw_shaps[0]
+                    
+                    shap_values = {
+                        'Spectral': float(local_shaps[0]),
+                        'Prosodic': float(local_shaps[1]),
+                        'Linguistic': float(local_shaps[2]),
+                        'SSL': float(local_shaps[3])
+                    }
+                except Exception as e:
+                    print(f"[!] Warning: Failed to calculate SHAP values: {e}")
+                    shap_values = {
+                        'Spectral': float(p_spec - 0.5),
+                        'Prosodic': float(p_pros - 0.5),
+                        'Linguistic': float(p_ling - 0.5),
+                        'SSL': float(p_ssl - 0.5)
+                    }
+            elif hasattr(self.meta_model, 'coef_'):
+                # Fallback for original Linear Regression
+                coefs = self.meta_model.coef_[0]
+                shap_values = {
+                    'Spectral': float(coefs[0] * p_spec),
+                    'Prosodic': float(coefs[1] * p_pros),
+                    'Linguistic': float(coefs[2] * p_ling),
+                    'SSL': float(coefs[3] * p_ssl)
+                }
+            else:
+                shap_values = {
+                    'Spectral': float(p_spec - 0.5),
+                    'Prosodic': float(p_pros - 0.5),
+                    'Linguistic': float(p_ling - 0.5),
+                    'SSL': float(p_ssl - 0.5)
+                }
         else:
             # Simple Average Fallback & Mock SHAP deviation
             final_prob = np.mean([p_spec, p_pros, p_ling, p_ssl])
@@ -116,6 +173,7 @@ class MultiAgentDetector:
             'agent_scores': scores,
             'transcript': transcript,
             'shap_values': shap_values,
+            'global_importances': self.global_importances,
             'spectral_shaps': get_top_contributors(spec_shaps),
             'prosodic_shaps': get_top_contributors(pros_shaps)
         }
@@ -136,4 +194,13 @@ if __name__ == "__main__":
     print("Agent Breakdowns:")
     for agent, score in result['agent_scores'].items():
         print(f" - {agent:<12}: {score:.4f}")
+    print("="*40)
+    print("SHAP TreeExplainer (Meta-Classifier Contributions):")
+    for agent, shap_val in result['shap_values'].items():
+        print(f" - {agent:<12}: {shap_val:+.4f}")
+    if result.get('global_importances'):
+        print("="*40)
+        print("Global Model Importances:")
+        for agent, imp in result['global_importances'].items():
+            print(f" - {agent:<12}: {imp:.4f}")
     print("="*40)
