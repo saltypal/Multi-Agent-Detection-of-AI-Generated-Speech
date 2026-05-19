@@ -92,9 +92,6 @@
         <!-- HEADER -->
         <header class="flex flex-col md:flex-row items-center justify-between py-4 border-b border-gray-900">
             <div class="flex items-center space-x-4">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center glow-indigo">
-                    <i class="fa-solid fa-shield-halved text-lg text-white"></i>
-                </div>
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight text-white heading-font">
                         MAD <span class="text-indigo-400">Forensics</span>
@@ -148,23 +145,7 @@
                         </div>
                     </div>
 
-                    <!-- Scanning Waveform -->
-                    <div id="scan-animation" class="hidden flex flex-col items-center space-y-3 py-3 relative border border-gray-900 rounded-xl bg-black/40 overflow-hidden">
-                        <div class="scanner-line"></div>
-                        <div class="flex items-center space-x-1 h-12 justify-center w-full">
-                            <div class="wave-bar"></div>
-                            <div class="wave-bar"></div>
-                            <div class="wave-bar"></div>
-                            <div class="wave-bar"></div>
-                            <div class="wave-bar"></div>
-                            <div class="wave-bar"></div>
-                            <div class="wave-bar"></div>
-                            <div class="wave-bar"></div>
-                        </div>
-                        <p class="text-5xs text-indigo-400 font-bold uppercase tracking-widest animate-pulse heading-font">
-                            Parallel Multi-Agent Scan Running...
-                        </p>
-                    </div>
+
 
                     <!-- Scan Trigger Button -->
                     <button id="scan-btn" disabled class="w-full py-3.5 px-4 rounded-xl font-bold bg-gray-900 text-gray-600 cursor-not-allowed transition-all flex items-center justify-center space-x-2 heading-font text-xs">
@@ -186,9 +167,6 @@
             <section class="lg:col-span-7 flex flex-col space-y-6">
                 <!-- Initial State (Waiting) -->
                 <div id="empty-state" class="glass-panel p-8 rounded-2xl flex flex-col items-center justify-center text-center h-full min-h-[380px]">
-                    <div class="w-14 h-14 rounded-full bg-gray-950 border border-gray-900 flex items-center justify-center mb-4 text-gray-600">
-                        <i class="fa-solid fa-fingerprint text-2xl"></i>
-                    </div>
                     <h3 class="text-sm font-bold text-white heading-font mb-1.5">No Audio Audited</h3>
                     <p class="text-xs text-gray-500 max-w-sm">
                         Please upload an audio sample on the left panel to execute deep acoustic, semantic, and SSL analysis.
@@ -407,7 +385,6 @@
         const fileName = document.getElementById('file-name');
         const fileSize = document.getElementById('file-size');
         const scanBtn = document.getElementById('scan-btn');
-        const scanAnimation = document.getElementById('scan-animation');
         
         const emptyState = document.getElementById('empty-state');
         const resultsPanel = document.getElementById('results-panel');
@@ -460,8 +437,7 @@
 
             scanBtn.setAttribute('disabled', 'true');
             scanBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            scanBtn.querySelector('span').textContent = 'Extracting Features & Executing Audits...';
-            scanAnimation.classList.remove('hidden');
+            scanBtn.querySelector('span').textContent = 'Executing Audits...';
 
             const formData = new FormData();
             formData.append('audio', selectedFile);
@@ -486,7 +462,6 @@
             scanBtn.removeAttribute('disabled');
             scanBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             scanBtn.querySelector('span').textContent = 'Audit Audio File';
-            scanAnimation.classList.add('hidden');
         }
 
         function displayResults(data) {
