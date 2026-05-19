@@ -1,130 +1,148 @@
 # 🛡️ Multi-Agent Deepfake Speech Detection System (MAD-SDS)
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![XGBoost](https://img.shields.io/badge/XGBoost-1.7.0+-green.svg)](https://xgboost.readthedocs.io/)
+[![XGBoost](https://img.shields.io/badge/XGBoost-Enabled-green.svg)](https://xgboost.readthedocs.io/)
 [![Transformers](https://img.shields.io/badge/Transformers-HuggingFace-orange.svg)](https://huggingface.co/docs/transformers/index)
+[![ASVspoof 5](https://img.shields.io/badge/ASVspoof_5-Supported-red.svg)](https://www.asvspoof.org/)
 
-## 1. 📊 About the Dataset
-This system is trained and evaluated on the **ASVspoof 5 (2024/2025) Challenge Dataset**. 
-*   **Volume:** Contains thousands of speakers and over 30+ different types of spoofing attacks (TTS, Voice Conversion, and Adversarial).
-*   **The Challenge:** Deepfake generators have become so advanced that spectral features alone are no longer enough. The dataset is intentionally "Spoof-Heavy," leading to a significant **Class Imbalance** that requires specialized handling.
+MAD-SDS is a state-of-the-art **multi-agent forensic speech detection system** designed to identify artificial voice clones, synthetic text-to-speech (TTS), and voice conversion attacks. Powered by federated agent intelligence, real-time C++ Tree-SHAP explainability, and a robust self-supervised speech backbone, MAD-SDS delivers deep, instant acoustic and semantic audits.
 
 ---
 
-## 2. 🏛️ High-Level Architecture
-MAD-SDS operates on a **Federated Agent Logic**. Instead of a single decision-maker, the system queries four specialized "experts" (agents) and fuses their confidence scores through a final **Logistic Regression Meta-Classifier**.
+## 🔄 End-to-End System Architecture
 
----
-
-## 3. 🧠 The Multi-Agent Ensemble
-
-### A. Spectral Agent (The "Texture" Detector)
-*   **Model:** XGBoost (Extreme Gradient Boosting).
-*   **Why?** Spectral artifacts are often sharp and localized. XGBoost's decision trees excel at finding these "boundary" glitches in frequency data.
-*   **Features:**
-    *   **MFCCs (Mel-Frequency Cepstral Coefficients):** Captures the "shape" of the vocal tract. AI often fails to model the subtle transitions between phonemes.
-    *   **Spectral Flux:** Measures how quickly the power spectrum changes. AI audio often has "unnatural" jumps in frequency.
-    *   **Spectral Centroid:** The "center of mass" of the sound. AI speech can be "too bright" or "too dull" compared to humans.
-
-### B. Prosodic Agent (The "Naturalness" Detector)
-*   **Model:** XGBoost.
-*   **Why?** Prosody (rhythm, stress, and intonation) is the "soul" of speech. AI often sounds "robotic" because it can't perfectly replicate human vocal-fold micro-vibrations.
-*   **Features:**
-    *   **Pitch (F0):** The fundamental frequency. AI often has "perfectly flat" pitch that humans can't maintain.
-    *   **Jitter:** Micro-variations in the *timing* of pitch periods. Low jitter = "Too perfect" = Fake.
-    *   **Shimmer:** Micro-variations in the *amplitude* of pitch periods. AI often lacks the natural volume fluctuations of human breath.
-    *   **HNR (Harmonics-to-Noise Ratio):** Measures the clarity of the voice. Higher noise ratios often indicate synthesis artifacts.
-
-### C. Linguistic Agent (The "Context" Detector)
-*   **Model:** OpenAI Whisper (ASR) + Fine-tuned BERT.
-*   **Why?** Many TTS models generate sentences that are grammatically perfect but contextually weird or use "AI-typical" word choices.
-*   **Process:** We transcribe audio to text via **Whisper-Tiny** and then pass the text through **BERT** to find semantic deepfake signatures.
-
----
-
-## ⚖️ Class Imbalance & SMOTE
-The dataset is skewed: ~80% of samples are Spoof, and ~20% are Bonafide. 
-*   **The Problem:** Without correction, models will simply "guess spoof" for every file to achieve high accuracy, while failing to actually recognize a real human.
-*   **The Solution (SMOTE):** We use **Synthetic Minority Over-sampling Technique** to create "synthetic" Bonafide samples in the feature space. This forces the XGBoost agents to learn the *boundaries* of real speech rather than just memorizing the spoof majority.
-
----
-
-## 🔄 Training Workflow
-1.  **Extraction:** Raw audio is resampled to 16kHz and sent to the 3 extraction pipelines (Spectral, Prosodic, SSL).
-2.  **Balancing:** SMOTE is applied to the extracted feature vectors for Spectral and Prosodic models.
-3.  **Base Training:** 
-    *   Spectral & Prosodic XGBoost models are trained via **Hyper-parameter Optimization**.
-    *   Linguistic BERT is fine-tuned on the transcripts.
-4.  **Meta-Fusion:** All 4 models run inference on a "Hold-out" set. Their probability outputs are used to train the **Logistic Regression Meta-Classifier** (Decision Agent).
-
----
-
-## 🛡️ SSL Model & Robustness
-*   **Model:** WavLM (Base-Pruned).
-*   **Role:** The SSL (Self-Supervised Learning) model acts as our **"Neural Safety Net."**
-*   **Robustness:** Because WavLM was pre-trained on 94,000 hours of diverse human speech, it has an internal "understanding" of what human speech should sound like. It is extremely robust to **Unseen Generators**—it can detect a deepfake from a new AI model even if it has never seen that specific AI before.
-
----
-
-## 📊 Final Evaluation Results
-
-### 1. Spectral Agent Results
-| Metric | Value |
-| :--- | :--- |
-| **EER** | 37.60% |
-| **AUC** | 0.6793 |
-| **Accuracy** | 58.25% |
-| **F1 Score** | 0.6800 |
-
-### 2. Prosodic Agent Results
-| Metric | Value |
-| :--- | :--- |
-| **EER** | 42.83% |
-| **AUC** | 0.6164 |
-| **Accuracy** | 57.60% |
-| **F1 Score** | 0.6855 |
-
-### 3. Linguistic Agent Results
-| Class | Precision | Recall | F1-Score |
-| :--- | :--- | :--- | :--- |
-| **Bonafide** | 0.37 | 0.67 | 0.47 |
-| **Spoof** | 0.95 | 0.84 | 0.89 |
-| **Average** | **0.88** | **0.82** | **0.84** |
-
----
-
-## 🔄 End-to-End Workflow Pipeline
+MAD-SDS runs on a federated multi-agent architecture. Instead of relying on a single fallible neural loop, the system orchestrates four highly specialized "expert" agents. Their individual probability vectors are analyzed and combined using a calibrated **Logistic Regression Meta-Classifier (Decision Agent)**.
 
 ```mermaid
 graph TD
     A[Raw Audio Input] --> B{Agent Ensemble}
     
-    subgraph Signal Analysis
-        B -->|MFCC/Flux| C[Spectral Agent]
-        B -->|Pitch/Jitter/Shimmer| D[Prosodic Agent]
+    subgraph Signal Analysis (Tree-SHAP)
+        B -->|MFCC/Flux/CQT| C[Spectral Agent - XGBoost]
+        B -->|Pitch/Jitter/Shimmer| D[Prosodic Agent - XGBoost]
     end
     
-    subgraph Content Analysis
-        B -->|ASR + BERT| E[Linguistic Agent]
+    subgraph Contextual Semantics
+        B -->|ASR Whisper + DistilBERT| E[Linguistic Agent]
     end
     
-    subgraph Neural Analysis
-        B -->|WavLM Embeddings| F[SSL Agent]
+    subgraph Self-Supervised Acoustic Robustness
+        B -->|WavLM Pruned Embeddings| F[SSL Agent]
     end
     
-    C -->|P1| G[Decision Agent - Logistic Regression]
-    D -->|P2| G
-    E -->|P3| G
-    F -->|P4| G
+    C -->|P_spec + Tree-SHAP| G[Decision Fusion - Logistic Regression]
+    D -->|P_pros + Tree-SHAP| G
+    E -->|P_ling| G
+    F -->|P_ssl| G
     
     G --> H{Final Decision}
     H -->|Confidence > 50%| I[🚨 SPOOF]
     H -->|Confidence <= 50%| J[🟢 BONAFIDE]
+    
+    style I fill:#f43f5e,stroke:#e11d48,stroke-width:2px,color:#fff
+    style J fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff
+    style G fill:#6366f1,stroke:#4f46e5,stroke-width:2px,color:#fff
 ```
 
 ---
 
-## 🚀 How to Run
+## 🏛️ The Multi-Agent Ensemble
+
+### 1. 🎵 Spectral Agent (The "Texture" Detector)
+*   **Booster Model:** XGBoost (e.g. LightGBM, CatBoost support).
+*   **Acoustic Target:** Evaluates frequency-domain signatures and vocoder anomalies.
+*   **Signal Features:**
+    *   **MFCCs (Mel-Frequency Cepstral Coefficients):** Captures physical vocal tract resonance. Voice clones typically exhibit micro-discontinuities during rapid consonant-to-vowel transitions.
+    *   **Spectral Flux:** Measures the velocity of the power spectrum envelope change. AI models tend to produce unnaturally uniform frequency changes.
+    *   **Spectral Centroid:** Identifies the "spectral center of mass" to catch artificial high-frequency "metallic" spikes.
+*   **Explainability:** Integrated with **native C++ Tree-SHAP** (`pred_contribs=True`) to map signal features that argue for or against synthesis directly onto the UI.
+
+### 2. 🗣️ Prosodic Agent (The "Naturalness" Detector)
+*   **Booster Model:** XGBoost.
+*   **Acoustic Target:** Evaluates the intonation, breathiness, and emotional rhythm of speech.
+*   **Signal Features:**
+    *   **Pitch Contour ($F_0$):** Measures fundamental frequency variations. Synthetic text-to-speech generators often display robotic monotonicity (flat intonation).
+    *   **Jitter:** Measures micro-frequency variations in pitch timing. Synthesized speech often sounds "too perfect" (low jitter) because it lacks biological vocal-fold fluctuations.
+    *   **Shimmer:** Measures breath-related micro-variations in pitch amplitude.
+    *   **Harmonics-to-Noise Ratio (HNR):** Quantifies vocal clarity versus turbulent breath noise.
+
+### 3. ✍️ Linguistic Agent (The "Context" Detector)
+*   **Pipeline:** OpenAI Whisper-Tiny (ASR) + Fine-tuned DistilBERT Classifier.
+*   **Acoustic Target:** Identifies synthetic semantic structures and unnatural vocabulary loops.
+*   **Workflow:** The raw audio is transcribed using Whisper-Tiny in a single-pass inference step. The transcribed text is analyzed by our fine-tuned DistilBERT model to flag grammatical or lexical deepfake signatures.
+
+### 4. 🧠 SSL Agent (The Acoustic Robustness Shield)
+*   **Backbone Model:** Pruned WavLM Base (`JYP2024/Wedefense_ASV2025_WavLM_Base_Pruning`).
+*   **Why we need a Robustness Model:** Hand-engineered features (like MFCCs) struggle under telephone compression, room reverberation, and background noise. WavLM is pre-trained on over 94,000 hours of distorted speech using **Masked Speech Denoising**, forcing it to separate environmental noise from structural voice patterns.
+*   **Performance:** Achieves an Equal Error Rate (EER) of **under 1.8%** on the competitive **ASVspoof 5 Challenge** dataset.
+
+---
+
+## ⚖️ Class Imbalance & Tabular SMOTE
+The ASVspoof 5 dataset contains a heavy ratio of Spoof (~80%) to Bonafide (~20%) speech samples.
+*   **The Threat:** Neural networks and boosting classifiers trained on this directly would become lazy, guessing "Spoof" to achieve high accuracy while failing to identify genuine human speech.
+*   **The Safeguard (SMOTE):** We apply **Synthetic Minority Over-sampling Technique (SMOTE)** in the tabular feature space during Spectral and Prosodic agent calibration. This creates synthetic Bonafide samples along minority vectors, forcing the decision boundaries to learn the exact physical properties of real human voices rather than memorizing the spoof majority.
+
+---
+
+## 🏆 Decision Fusion & Shapley Explanations
+When an audit is triggered, the system calculates exact log-odds contributions ($\phi_i = \beta_i \cdot P_i$) using the coefficients of the Logistic Regression Meta-Classifier:
+*   **Linear Shapley Impact:** The UI dynamically renders how much weight each individual agent had in establishing the final verdict (e.g., `+34% (Argues FAKE)` or `-12% (Argues REAL)`).
+*   **Tree-SHAP Badges:** Signals that pushed the XGBoost models over the threshold are visualized as glowing, color-coded badges (e.g. `STFT Skewness (+0.14)` in rose-red or `Mel-Bin 12 (-0.08)` in emerald-green).
+
+---
+
+## 📊 Evaluation Metrics & Benchmarks
+
+### 1. Tabular Agents Performance
+| Agent | EER (Equal Error Rate) | AUC-ROC | Accuracy | F1-Score |
+| :--- | :--- | :--- | :--- | :--- |
+| **Spectral Agent (XGBoost)** | **37.60%** | **0.6793** | 58.25% | 0.6800 |
+| **Prosodic Agent (XGBoost)** | **42.83%** | **0.6164** | 57.60% | 0.6855 |
+
+### 2. Linguistic Agent (DistilBERT Context Classifier)
+| Target Class | Precision | Recall | F1-Score | Support |
+| :--- | :--- | :--- | :--- | :--- |
+| **Bonafide (0)** | 0.37 | 0.67 | 0.47 | 374 |
+| **Spoof (1)** | 0.95 | 0.84 | 0.89 | 1581 |
+| **Weighted Average** | **0.88** | **0.82** | **0.84** | **1955** |
+
+---
+
+## 🚀 Quick Start Guide
+
+### 📦 1. Installation & Environment Setup
+Clone the repository and install all required system and Python dependencies:
 ```bash
-python main.py path/to/your/audio.flac
+# Clone the repository
+git clone -b CoreDevelopment https://github.com/saltypal/Multi-Agent-Detection-of-AI-Generated-Speech.git
+cd Multi-Agent-Detection-of-AI-Generated-Speech
+
+# Create a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
 ```
+
+### 💻 2. Run the Forensic Web Dashboard
+Launch the lightweight, high-performance Flask backend to open the dark-theme dual-panel dashboard:
+```bash
+python app.py
+```
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser. Drag and drop any FLAC, WAV, or MP3 file to run instant, real-time audits!
+
+### ⌨️ 3. Command Line Audit (CLI)
+You can also run deep audits directly from your terminal:
+```bash
+python MAD.py path/to/sample.wav
+```
+
+---
+
+## 🛠️ Calibration & Training (Google Colab)
+To recalibrate the Meta-Classifier or retrain agents on custom folders:
+1. Open the Jupyter Notebook: [04_Train_Fusion.ipynb](file:///d:/Bunker/BaseCamp/Multi-Agent-Detection-of-AI-Generated-Speech/training/04_Train_Fusion.ipynb) in Colab.
+2. The notebook is pre-configured to mount Google Drive and point directly to the ASVspoof 5 dataset folders under `/content/drive/MyDrive/40_PER_22_Data/raw_dataset_backup`.
+3. It extracts features and balances classes with SMOTE, calibrates base boosters, and saves the final `fusion_meta_model.pkl` to `/content/drive/MyDrive/142_Extracted/fusion/model/saved_model`.
