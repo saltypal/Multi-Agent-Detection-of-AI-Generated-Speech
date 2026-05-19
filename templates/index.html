@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAD: Multi-Agent Deepfake Speech Detector</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Outfit & Space Grotesk -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chart.js for Ensembles -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(135deg, #090d16 0%, #030712 100%);
+            color: #f3f4f6;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .heading-font {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        /* Glassmorphism Classes */
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.55);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .glass-card {
+            background: rgba(31, 41, 55, 0.35);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(99, 102, 241, 0.3);
+            box-shadow: 0 12px 24px -10px rgba(99, 102, 241, 0.2);
+        }
+
+        /* Glowing Accents */
+        .glow-cyan {
+            box-shadow: 0 0 20px 0 rgba(6, 182, 212, 0.35);
+        }
+
+        .glow-indigo {
+            box-shadow: 0 0 20px 0 rgba(99, 102, 241, 0.35);
+        }
+
+        .glow-green {
+            box-shadow: 0 0 25px 0 rgba(16, 185, 129, 0.4);
+        }
+
+        .glow-red {
+            box-shadow: 0 0 25px 0 rgba(244, 63, 94, 0.4);
+        }
+
+        /* Scanline Animation */
+        @keyframes scan {
+            0% { top: 0%; }
+            50% { top: 100%; }
+            100% { top: 0%; }
+        }
+
+        .scanner-line {
+            height: 4px;
+            background: linear-gradient(90deg, transparent, #06b6d4, transparent);
+            animation: scan 3s infinite linear;
+            position: absolute;
+            width: 100%;
+            left: 0;
+            z-index: 10;
+        }
+
+        /* Pulsing Audio Wave Mock */
+        @keyframes wave {
+            0%, 100% { height: 8px; }
+            50% { height: 48px; }
+        }
+
+        .wave-bar {
+            width: 4px;
+            height: 8px;
+            background-color: #6366f1;
+            border-radius: 4px;
+            animation: wave 1.2s ease-in-out infinite;
+        }
+
+        .wave-bar:nth-child(even) {
+            background-color: #06b6d4;
+            animation-delay: 0.2s;
+        }
+
+        .wave-bar:nth-child(3n) {
+            background-color: #8b5cf6;
+            animation-delay: 0.4s;
+        }
+
+        .wave-bar:nth-child(4n) {
+            animation-delay: 0.6s;
+        }
+    </style>
+</head>
+<body class="py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- HEADER -->
+        <header class="flex flex-col md:flex-row items-center justify-between mb-10 pb-6 border-b border-gray-800">
+            <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center glow-indigo">
+                    <i class="fa-solid fa-brain text-xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-3xl font-bold tracking-tight text-white heading-font">
+                        MAD <span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">Deepfake Detector</span>
+                    </h1>
+                    <p class="text-sm text-gray-400">Hierarchical Multi-Agent Speech Authentication System</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-950 text-indigo-400 border border-indigo-800">
+                    <span class="w-2 h-2 mr-2 rounded-full bg-indigo-400 animate-pulse"></span>
+                    Local Host Active
+                </span>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-cyan-950 text-cyan-400 border border-cyan-800">
+                    <i class="fa-solid fa-circle-nodes mr-2 text-2xs"></i>
+                    4 Specialized Agents
+                </span>
+            </div>
+        </header>
+
+        <!-- MAIN LAYOUT -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+            <!-- LEFT PANEL: UPLOAD AND SCAN -->
+            <section class="lg:col-span-5 flex flex-col space-y-6">
+                <div class="glass-panel p-6 rounded-2xl flex flex-col space-y-6 relative overflow-hidden">
+                    <h2 class="text-xl font-bold heading-font text-white flex items-center">
+                        <i class="fa-solid fa-microphone-lines text-cyan-400 mr-3"></i>
+                        Analyze Speech Sample
+                    </h2>
+
+                    <!-- Drag & Drop Uploader -->
+                    <div id="dropzone" class="border-2 border-dashed border-gray-700 hover:border-indigo-500 rounded-xl p-8 text-center cursor-pointer transition-all duration-300 bg-gray-900/20 relative group">
+                        <input type="file" id="audio-input" accept=".flac,.wav,.mp3" class="hidden">
+                        
+                        <div class="flex flex-col items-center space-y-3" id="upload-prompt">
+                            <div class="w-14 h-14 rounded-full bg-gray-800 flex items-center justify-center group-hover:bg-indigo-950/50 group-hover:text-indigo-400 transition-colors duration-300">
+                                <i class="fa-solid fa-cloud-arrow-up text-2xl text-gray-400 group-hover:text-indigo-400"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-gray-300">Drag & drop your audio file here</p>
+                                <p class="text-xs text-gray-500 mt-1">Supports .FLAC, .WAV, or .MP3</p>
+                            </div>
+                        </div>
+
+                        <!-- File Loaded State -->
+                        <div class="hidden flex flex-col items-center space-y-4" id="file-loaded">
+                            <div class="w-14 h-14 rounded-full bg-emerald-950/30 border border-emerald-800 flex items-center justify-center text-emerald-400 glow-green">
+                                <i class="fa-solid fa-file-audio text-2xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-gray-200" id="file-name">filename.flac</p>
+                                <p class="text-xs text-emerald-500 mt-1" id="file-size">Ready for extraction</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Scan Sequence Waveform (Hidden by default) -->
+                    <div id="scan-animation" class="hidden flex flex-col items-center space-y-4 py-4 relative border border-gray-800 rounded-xl bg-black/30 overflow-hidden">
+                        <div class="scanner-line"></div>
+                        <div class="flex items-center space-x-1.5 h-16 justify-center w-full">
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar font-bold"></div>
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                            <div class="wave-bar"></div>
+                        </div>
+                        <p class="text-xs text-cyan-400 font-semibold uppercase tracking-wider animate-pulse heading-font">
+                            Agents Running Parallel Audits...
+                        </p>
+                    </div>
+
+                    <!-- Trigger Button -->
+                    <button id="scan-btn" disabled class="w-full py-4 px-6 rounded-xl font-bold bg-gray-800 text-gray-500 cursor-not-allowed transition-all duration-300 flex items-center justify-center space-x-3 heading-font">
+                        <i class="fa-solid fa-bolt"></i>
+                        <span>Scan Audio File</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- RIGHT PANEL: DETAILED AUDIT AND RESULTS -->
+            <section class="lg:col-span-7 flex flex-col space-y-6">
+                <!-- Welcome/Initial State -->
+                <div id="empty-state" class="glass-panel p-10 rounded-2xl flex flex-col items-center justify-center text-center h-full min-h-[350px]">
+                    <div class="w-20 h-20 rounded-full bg-gray-900 border border-gray-800 flex items-center justify-center mb-6 text-gray-600">
+                        <i class="fa-solid fa-fingerprint text-4xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white heading-font mb-2">Awaiting Forensic Audit</h3>
+                    <p class="text-sm text-gray-500 max-w-md">
+                        Upload an audio speech file and initiate a scan to compute multi-agent consensus metrics, feature coefficients, and EER metrics.
+                    </p>
+                </div>
+
+                <!-- Forensic Results (Hidden by default) -->
+                <div id="results-panel" class="hidden flex flex-col space-y-6">
+                    <!-- Ensemble Consensus Summary -->
+                    <div class="glass-panel p-6 rounded-2xl relative overflow-hidden" id="verdict-container">
+                        <!-- Background Glow Accent -->
+                        <div class="absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20" id="glow-badge-bg"></div>
+                        
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
+                            <div>
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1 heading-font">Ensemble Consensus Verdict</h3>
+                                <div class="flex items-baseline space-x-3">
+                                    <span class="text-4xl font-extrabold tracking-tight heading-font" id="final-decision-txt">SPOOF</span>
+                                    <span class="text-sm text-gray-500" id="final-decision-sub">AI-Generated Voice</span>
+                                </div>
+                            </div>
+                            
+                            <div class="flex flex-col items-end">
+                                <span class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1 heading-font">Consensus Confidence</span>
+                                <span class="text-3xl font-extrabold tracking-tight text-white heading-font" id="final-confidence-txt">97.80%</span>
+                            </div>
+                        </div>
+
+                        <!-- Progress Ensemble Bar -->
+                        <div class="w-full bg-gray-900 h-2.5 rounded-full mt-6 overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-1000" id="consensus-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Ensembles and Radar View -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Radar Score Visualization -->
+                        <div class="glass-panel p-6 rounded-2xl flex flex-col items-center">
+                            <h3 class="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4 self-start heading-font">Agent Consensus Matrix</h3>
+                            <div class="w-full max-w-[240px] h-[240px] flex items-center justify-center">
+                                <canvas id="radar-chart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Explainability/Diagnostics Panel -->
+                        <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between">
+                            <h3 class="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4 heading-font">Acoustic Explainability</h3>
+                            <div class="space-y-3.5">
+                                <div class="flex items-start space-x-3">
+                                    <div class="w-8 h-8 rounded-lg bg-cyan-950/40 text-cyan-400 flex items-center justify-center flex-shrink-0 border border-cyan-900/30">
+                                        <i class="fa-solid fa-wave-square text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm font-semibold text-white">Spectral Extraction</h4>
+                                        <p class="text-xs text-gray-400">Evaluates Mel, STFT, MFCCs, LFCC, and CQT bins for frequency artifacts.</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start space-x-3">
+                                    <div class="w-8 h-8 rounded-lg bg-indigo-950/40 text-indigo-400 flex items-center justify-center flex-shrink-0 border border-indigo-900/30">
+                                        <i class="fa-solid fa-arrows-spin text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm font-semibold text-white">Prosodic Tracking</h4>
+                                        <p class="text-xs text-gray-400">Measures pitch contour (F0 tracking) and speech energy dynamics over time.</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start space-x-3">
+                                    <div class="w-8 h-8 rounded-lg bg-violet-950/40 text-violet-400 flex items-center justify-center flex-shrink-0 border border-violet-900/30">
+                                        <i class="fa-solid fa-quote-left text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm font-semibold text-white">Linguistic Analysis</h4>
+                                        <p class="text-xs text-gray-400">Fine-tuned DistilBERT analyzing syntactical structures and token frequencies.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- BOTTOM AGENTS GRID -->
+        <div class="glass-panel p-6 rounded-2xl mb-8 hidden" id="agents-grid-container">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-gray-400 mb-6 heading-font">Specialized Agent Breakdowns</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <!-- Agent 1: Spectral -->
+                <div class="glass-card p-5 rounded-xl flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-bold uppercase tracking-wider text-gray-400 heading-font">Spectral Agent</span>
+                        <span id="spectral-badge" class="px-2 py-0.5 rounded text-4xs font-bold uppercase border">REAL</span>
+                    </div>
+                    <div>
+                        <div class="text-3xl font-extrabold text-white mb-2 heading-font" id="spectral-score">0.00%</div>
+                        <div class="w-full bg-gray-900 h-1.5 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-1000" id="spectral-bar" style="width: 0%"></div>
+                        </div>
+                        <p class="text-4xs text-gray-500 mt-3">Evaluates Mel, STFT, and CQT bins for artifacts</p>
+                    </div>
+                </div>
+
+                <!-- Agent 2: Prosodic -->
+                <div class="glass-card p-5 rounded-xl flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-bold uppercase tracking-wider text-gray-400 heading-font">Prosodic Agent</span>
+                        <span id="prosodic-badge" class="px-2 py-0.5 rounded text-4xs font-bold uppercase border">REAL</span>
+                    </div>
+                    <div>
+                        <div class="text-3xl font-extrabold text-white mb-2 heading-font" id="prosodic-score">0.00%</div>
+                        <div class="w-full bg-gray-900 h-1.5 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-1000" id="prosodic-bar" style="width: 0%"></div>
+                        </div>
+                        <p class="text-4xs text-gray-500 mt-3">Pitch contour (F0 tracking) and speech energy</p>
+                    </div>
+                </div>
+
+                <!-- Agent 3: Linguistic -->
+                <div class="glass-card p-5 rounded-xl flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-bold uppercase tracking-wider text-gray-400 heading-font">Linguistic Agent</span>
+                        <span id="linguistic-badge" class="px-2 py-0.5 rounded text-4xs font-bold uppercase border">REAL</span>
+                    </div>
+                    <div>
+                        <div class="text-3xl font-extrabold text-white mb-2 heading-font" id="linguistic-score">0.00%</div>
+                        <div class="w-full bg-gray-900 h-1.5 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-1000" id="linguistic-bar" style="width: 0%"></div>
+                        </div>
+                        <p class="text-4xs text-gray-500 mt-3">Syntactical structure anomalies and token analysis</p>
+                    </div>
+                </div>
+
+                <!-- Agent 4: SSL Model -->
+                <div class="glass-card p-5 rounded-xl flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-xs font-bold uppercase tracking-wider text-gray-400 heading-font">SSL Model</span>
+                        <span id="ssl-badge" class="px-2 py-0.5 rounded text-4xs font-bold uppercase border">REAL</span>
+                    </div>
+                    <div>
+                        <div class="text-3xl font-extrabold text-white mb-2 heading-font" id="ssl-score">0.00%</div>
+                        <div class="w-full bg-gray-900 h-1.5 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-1000" id="ssl-bar" style="width: 0%"></div>
+                        </div>
+                        <p class="text-4xs text-gray-500 mt-3">Pruned WavLM embeddings representation alignment</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT LOGIC -->
+    <script>
+        const dropzone = document.getElementById('dropzone');
+        const audioInput = document.getElementById('audio-input');
+        const uploadPrompt = document.getElementById('upload-prompt');
+        const fileLoaded = document.getElementById('file-loaded');
+        const fileName = document.getElementById('file-name');
+        const fileSize = document.getElementById('file-size');
+        const scanBtn = document.getElementById('scan-btn');
+        const scanAnimation = document.getElementById('scan-animation');
+        
+        const emptyState = document.getElementById('empty-state');
+        const resultsPanel = document.getElementById('results-panel');
+        const agentsGridContainer = document.getElementById('agents-grid-container');
+
+        let selectedFile = null;
+        let radarChart = null;
+
+        // Uploader Interactions
+        dropzone.addEventListener('click', () => audioInput.click());
+        audioInput.addEventListener('change', handleFileSelect);
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('border-indigo-500');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('border-indigo-500');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('border-indigo-500');
+            if (e.dataTransfer.files.length > 0) {
+                audioInput.files = e.dataTransfer.files;
+                handleFileSelect();
+            }
+        });
+
+        function handleFileSelect() {
+            if (audioInput.files.length > 0) {
+                selectedFile = audioInput.files[0];
+                fileName.textContent = selectedFile.name;
+                fileSize.textContent = `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB - Ready to Scan`;
+                
+                uploadPrompt.classList.add('hidden');
+                fileLoaded.classList.remove('hidden');
+                
+                scanBtn.removeAttribute('disabled');
+                scanBtn.classList.remove('bg-gray-800', 'text-gray-500', 'cursor-not-allowed');
+                scanBtn.classList.add('bg-gradient-to-r', 'from-indigo-600', 'to-cyan-500', 'text-white', 'hover:opacity-90', 'glow-indigo');
+            }
+        }
+
+        // Trigger Inference
+        scanBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            // Update UI to Scanning state
+            scanBtn.setAttribute('disabled', 'true');
+            scanBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            scanBtn.querySelector('span').textContent = 'Extracting Speech & Evaluating...';
+            scanAnimation.classList.remove('hidden');
+
+            const formData = new FormData();
+            formData.append('audio', selectedFile);
+
+            try {
+                const response = await fetch('/detect', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Analysis failed or was aborted.');
+                }
+
+                const data = await response.json();
+                displayResults(data);
+
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+                resetScanner();
+            }
+        });
+
+        function resetScanner() {
+            scanBtn.removeAttribute('disabled');
+            scanBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            scanBtn.querySelector('span').textContent = 'Scan Audio File';
+            scanAnimation.classList.add('hidden');
+        }
+
+        function displayResults(data) {
+            resetScanner();
+            
+            // Toggle view panels
+            emptyState.classList.add('hidden');
+            resultsPanel.classList.remove('hidden');
+            agentsGridContainer.classList.remove('hidden');
+
+            // 1. Verdict Card Styling based on Decision
+            const finalDecision = data.final_decision;
+            const finalConfidence = data.confidence * 100;
+            const finalDecisionTxt = document.getElementById('final-decision-txt');
+            const finalDecisionSub = document.getElementById('final-decision-sub');
+            const finalConfidenceTxt = document.getElementById('final-confidence-txt');
+            const consensusBar = document.getElementById('consensus-bar');
+            const verdictContainer = document.getElementById('verdict-container');
+            const glowBg = document.getElementById('glow-badge-bg');
+
+            finalDecisionTxt.textContent = finalDecision;
+            finalConfidenceTxt.textContent = `${finalConfidence.toFixed(2)}%`;
+            consensusBar.style.width = `${finalConfidence}%`;
+
+            if (finalDecision === 'SPOOF') {
+                finalDecisionTxt.className = "text-4xl font-extrabold tracking-tight text-rose-500 heading-font";
+                finalDecisionSub.textContent = "AI-Generated Speech";
+                consensusBar.className = "h-full rounded-full bg-rose-500 glow-red";
+                verdictContainer.className = "glass-panel p-6 rounded-2xl relative overflow-hidden border border-rose-950/40 bg-rose-950/10";
+                glowBg.className = "absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 bg-rose-500";
+            } else {
+                finalDecisionTxt.className = "text-4xl font-extrabold tracking-tight text-emerald-500 heading-font";
+                finalDecisionSub.textContent = "Authentic Speech Sample";
+                consensusBar.className = "h-full rounded-full bg-emerald-500 glow-green";
+                verdictContainer.className = "glass-panel p-6 rounded-2xl relative overflow-hidden border border-emerald-950/40 bg-emerald-950/10";
+                glowBg.className = "absolute -right-16 -top-16 w-32 h-32 rounded-full blur-3xl opacity-20 bg-emerald-500";
+            }
+
+            // 2. Individual Agents Progress & Badges
+            updateAgentCard('spectral', data.agent_scores.Spectral);
+            updateAgentCard('prosodic', data.agent_scores.Prosodic);
+            updateAgentCard('linguistic', data.agent_scores.Linguistic);
+            updateAgentCard('ssl', data.agent_scores.SSL);
+
+            // 3. Radar Chart Consensus
+            updateRadarChart(data.agent_scores);
+        }
+
+        function updateAgentCard(id, score) {
+            const scorePercent = score * 100;
+            const scoreTxt = document.getElementById(`${id}-score`);
+            const bar = document.getElementById(`${id}-bar`);
+            const badge = document.getElementById(`${id}-badge`);
+
+            scoreTxt.textContent = `${scorePercent.toFixed(2)}%`;
+            bar.style.width = `${scorePercent}%`;
+
+            if (score > 0.5) {
+                badge.textContent = "SPOOF";
+                badge.className = "px-2 py-0.5 rounded text-4xs font-bold uppercase border bg-rose-950/50 text-rose-400 border-rose-900/30";
+                bar.className = "h-full rounded-full bg-rose-500";
+            } else {
+                badge.textContent = "REAL";
+                badge.className = "px-2 py-0.5 rounded text-4xs font-bold uppercase border bg-emerald-950/50 text-emerald-400 border-emerald-900/30";
+                bar.className = "h-full rounded-full bg-emerald-500";
+            }
+        }
+
+        function updateRadarChart(scores) {
+            if (radarChart) {
+                radarChart.destroy();
+            }
+
+            const ctx = document.getElementById('radar-chart').getContext('2d');
+            
+            // Custom Styling for radar chart
+            Chart.defaults.color = '#9ca3af';
+            Chart.defaults.font.family = "'Space Grotesk', sans-serif";
+
+            radarChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['Spectral', 'Prosodic', 'Linguistic', 'SSL WavLM'],
+                    datasets: [{
+                        label: 'Spoof Probability',
+                        data: [scores.Spectral, scores.Prosodic, scores.Linguistic, scores.SSL],
+                        backgroundColor: 'rgba(99, 102, 241, 0.25)',
+                        borderColor: '#6366f1',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#06b6d4',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '#06b6d4'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        r: {
+                            min: 0,
+                            max: 1,
+                            ticks: {
+                                stepSize: 0.2,
+                                display: false
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.08)'
+                            },
+                            angleLines: {
+                                color: 'rgba(255, 255, 255, 0.08)'
+                            },
+                            pointLabels: {
+                                font: { size: 10 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

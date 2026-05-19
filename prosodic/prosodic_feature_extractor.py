@@ -22,13 +22,16 @@ import warnings
 from pathlib import Path
 
 import numpy as np
+# pyrefly: ignore [missing-import]
 import librosa
 from scipy.signal import find_peaks
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
 try:
+    # pyrefly: ignore [missing-import]
     import parselmouth
+    # pyrefly: ignore [missing-import]
     from parselmouth.praat import call
     HAS_PRAAT = True
 except ImportError:
@@ -177,6 +180,98 @@ def get_feature_names() -> list[str]:
         "jitter_local",
         "shimmer_local",
         "energy_mean", "energy_std",
-        "syllable_rate",
     ]
     return names
+
+try:
+    import torch
+    import torchaudio
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+
+def extract_prosodic_batch(waveforms: np.ndarray | torch.Tensor, sr: int = SR, device: str = 'cuda') -> list[dict]:
+    """
+    GPU-accelerated extraction of prosodic features for a batch of audio.
+    waveforms: shape (batch, frames). Padded to the same length.
+    """
+    if not HAS_TORCH:
+        raise ImportError("PyTorch and torchaudio are required for batch extraction.")
+        
+    if not isinstance(waveforms, torch.Tensor):
+        waveforms = torch.tensor(waveforms, dtype=torch.float32)
+    waveforms = waveforms.to(device)
+    batch_size = waveforms.size(0)
+    
+    # Normalize peak per waveform
+    peaks = torch.abs(waveforms).max(dim=1, keepdim=True).values
+    peaks[peaks == 0] = 1.0
+    waveforms = waveforms / peaks
+    
+    duration = waveforms.size(1) / sr
+    hop_length = 160
+    
+    # ── 1. F0 (Pitch) via Torchaudio ──
+    # returns shape (batch, freq_frames)
+    pitch = torchaudio.functional.detect_pitch_frequency(waveforms, sample_rate=sr)
+    
+    # ── 2. RMS Energy ──
+    unfolded = waveforms.unfold(-1, hop_length, hop_length)
+    rms_frames = torch.sqrt(torch.mean(unfolded**2, dim=-1))
+    
+    # Assembly via fast CPU iterators for the non-matrix stuff (peak counting, filtering)
+    pitch_np = pitch.cpu().numpy()
+    rms_np = rms_frames.cpu().numpy()
+    
+    results = []
+    for b in range(batch_size):
+        row = {}
+        
+        # F0 stats
+        f0 = pitch_np[b]
+        voiced = f0[f0 > 0]
+        if len(voiced) > 0:
+            row["f0_mean"]  = float(voiced.mean())
+            row["f0_std"]   = float(voiced.std())
+            row["f0_range"] = float(voiced.max() - voiced.min())
+        else:
+            row["f0_mean"] = row["f0_std"] = row["f0_range"] = 0.0
+            
+        # Voiced ratio
+        row["voiced_ratio"] = float(len(voiced) / (len(f0) + 1e-9))
+        
+        # Jitter local
+        if len(voiced) > 1:
+            periods = 1.0 / voiced
+            row["jitter_local"] = float(np.mean(np.abs(np.diff(periods))) / (np.mean(periods) + 1e-9))
+        else:
+            row["jitter_local"] = 0.0
+            
+        # Shimmer local
+        rms = rms_np[b]
+        if len(rms) > 1:
+            row["shimmer_local"] = float(np.mean(np.abs(np.diff(rms))) / (np.mean(rms) + 1e-9))
+        else:
+            row["shimmer_local"] = 0.0
+            
+        # Energy global
+        row["energy_mean"] = float(np.nan_to_num(rms.mean()))
+        row["energy_std"]  = float(np.nan_to_num(rms.std()))
+        
+        # Syllable rate (peaks in smoothed energy)
+        if len(rms) > 5:
+            smoothed = np.convolve(rms, np.ones(5)/5, mode='same')
+            from scipy.signal import find_peaks
+            peaks_idx, _ = find_peaks(smoothed, height=smoothed.mean())
+            row["syllable_rate"] = float(len(peaks_idx) / (duration + 1e-6))
+        else:
+            row["syllable_rate"] = 0.0
+            
+        # NaN safety
+        for k, v in row.items():
+            if np.isnan(v) or np.isinf(v):
+                row[k] = 0.0
+                
+        results.append(row)
+        
+    return results

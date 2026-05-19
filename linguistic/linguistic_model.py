@@ -6,22 +6,26 @@ Uses OpenAI Whisper for ASR and a fine-tuned BERT for text classification.
 """
 
 import torch
+# pyrefly: ignore [missing-import]
 import librosa
+# pyrefly: ignore [missing-import]
 from transformers import WhisperProcessor, WhisperForConditionalGeneration, AutoTokenizer, AutoModelForSequenceClassification
 from pathlib import Path
 import numpy as np
 
 class LinguisticAgent:
-    def __init__(self, model_path=None, device=None):
+    def __init__(self, model_path=None, device=None, cache_dir="trained_models/hf_cache"):
         """
-        Initialize the Linguistic Agent.
+        Initialize the Linguistic Agent with local caching for speed.
         """
         self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
         
-        # Load Whisper directly (skipping the buggy pipeline)
-        print(f"[*] Loading Whisper-Tiny on {self.device}...")
-        self.processor = WhisperProcessor.from_pretrained("openai/whisper-tiny")
-        self.whisper_model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny").to(self.device)
+        # Load Whisper directly from local cache if possible
+        print(f"[*] Loading Whisper-Tiny (Local Cache: {self.cache_dir})...")
+        self.processor = WhisperProcessor.from_pretrained("openai/whisper-tiny", cache_dir=str(self.cache_dir))
+        self.whisper_model = WhisperForConditionalGeneration.from_pretrained("openai/whisper-tiny", cache_dir=str(self.cache_dir)).to(self.device)
         
         # Load BERT for classification
         if model_path:
@@ -29,9 +33,9 @@ class LinguisticAgent:
             self.tokenizer = AutoTokenizer.from_pretrained(model_path)
             self.classifier = AutoModelForSequenceClassification.from_pretrained(model_path).to(self.device)
         else:
-            print("[*] Loading base BERT (for inference only)...")
-            self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-            self.classifier = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=2).to(self.device)
+            print(f"[*] Loading base BERT from cache...")
+            self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased", cache_dir=str(self.cache_dir))
+            self.classifier = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=2, cache_dir=str(self.cache_dir)).to(self.device)
             
     def transcribe(self, audio_path):
         """Transcribe audio by bypassing the pipeline entirely."""
