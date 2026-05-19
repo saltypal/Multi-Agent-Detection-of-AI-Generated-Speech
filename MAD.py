@@ -49,13 +49,22 @@ class MultiAgentDetector:
         Returns: {
             'final_decision': 'SPOOF' | 'BONAFIDE',
             'confidence': float,
-            'agent_scores': dict
+            'agent_scores': dict,
+            'transcript': str
         }
         """
-        # Run individual agents
-        p_spec = self.spec_agent.predict(audio_path)
-        p_pros = self.pros_agent.predict(audio_path)
-        p_ling = self.ling_agent.predict(audio_path)
+        # Run individual agents with native signal Tree-SHAP contributions
+        p_spec, spec_shaps = self.spec_agent.predict_with_shap(audio_path)
+        p_pros, pros_shaps = self.pros_agent.predict_with_shap(audio_path)
+        
+        # Extract transcript once and evaluate text
+        transcript = self.ling_agent.transcribe(audio_path)
+        if transcript:
+            p_ling = self.ling_agent.predict_text(transcript)
+        else:
+            transcript = "[No speech detected]"
+            p_ling = 0.0
+            
         p_ssl  = self.ssl_agent.predict(audio_path)
         
         scores = {
@@ -65,14 +74,38 @@ class MultiAgentDetector:
             'SSL': p_ssl
         }
         
-        # Fusion
+        # Helper to isolate top 3 SHAP feature contributions
+        def get_top_contributors(shap_dict, num=3):
+            if not shap_dict:
+                return {"fake": [], "real": []}
+            sorted_features = sorted(shap_dict.items(), key=lambda x: x[1], reverse=True)
+            fake_contribs = [{"feature": f, "value": float(v)} for f, v in sorted_features[:num] if v > 0.001]
+            real_contribs = [{"feature": f, "value": float(v)} for f, v in reversed(sorted_features) if v < -0.001][:num]
+            return {"fake": fake_contribs, "real": real_contribs}
+            
+        # Fusion & SHAP explainability
         if self.meta_model:
             # Inputs must be in the same order as training
             X = np.array([[p_spec, p_pros, p_ling, p_ssl]])
             final_prob = self.meta_model.predict_proba(X)[0][1]
+            
+            # Exact linear Shapley/feature contributions for log-odds logit
+            coefs = self.meta_model.coef_[0]
+            shap_values = {
+                'Spectral': float(coefs[0] * p_spec),
+                'Prosodic': float(coefs[1] * p_pros),
+                'Linguistic': float(coefs[2] * p_ling),
+                'SSL': float(coefs[3] * p_ssl)
+            }
         else:
-            # Simple Average Fallback
+            # Simple Average Fallback & Mock SHAP deviation
             final_prob = np.mean([p_spec, p_pros, p_ling, p_ssl])
+            shap_values = {
+                'Spectral': float(p_spec - 0.5),
+                'Prosodic': float(p_pros - 0.5),
+                'Linguistic': float(p_ling - 0.5),
+                'SSL': float(p_ssl - 0.5)
+            }
             
         decision = "SPOOF" if final_prob > 0.5 else "BONAFIDE"
         confidence = final_prob if final_prob > 0.5 else (1 - final_prob)
@@ -80,7 +113,11 @@ class MultiAgentDetector:
         return {
             'final_decision': decision,
             'confidence': float(confidence),
-            'agent_scores': scores
+            'agent_scores': scores,
+            'transcript': transcript,
+            'shap_values': shap_values,
+            'spectral_shaps': get_top_contributors(spec_shaps),
+            'prosodic_shaps': get_top_contributors(pros_shaps)
         }
 
 if __name__ == "__main__":

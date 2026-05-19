@@ -118,3 +118,29 @@ class ProsodicAgent:
         from prosodic.prosodic_feature_extractor import extract_prosodic_row
         row = extract_prosodic_row(audio_path)
         return self.predict_features(row)
+
+    def predict_with_shap(self, audio_path: str | Path) -> tuple[float, dict[str, float]]:
+        """End-to-end prediction with native Tree-SHAP value contributions for features."""
+        from prosodic.prosodic_feature_extractor import extract_prosodic_row
+        row = extract_prosodic_row(audio_path)
+        
+        cols = self.feat_cols if self.feat_cols else sorted(row.keys())
+        X = np.array([[row.get(c, 0.0) for c in cols]])
+        np.nan_to_num(X, copy=False)
+        
+        prob = float(self.xgb_model.predict_proba(X)[0, 1]) if self.xgb_model else 0.5
+        
+        shap_dict = {}
+        if self.xgb_model:
+            try:
+                import xgboost as xgb
+                booster = self.xgb_model.get_booster()
+                dmat = xgb.DMatrix(X, feature_names=cols)
+                contribs = booster.predict(dmat, pred_contribs=True)[0]
+                
+                # Zip feature names with SHAP values, excluding the last bias value
+                shap_dict = {cols[i]: float(contribs[i]) for i in range(len(cols))}
+            except Exception as e:
+                print(f"[!] Warning calculating Prosodic Tree-SHAP: {e}")
+                
+        return prob, shap_dict
